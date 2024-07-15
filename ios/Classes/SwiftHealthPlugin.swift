@@ -606,13 +606,14 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
         // Convert dates from milliseconds to Date()
         let dateFrom = Date(timeIntervalSince1970: startTime / 1000) // Changed
         let dateTo = Date(timeIntervalSince1970: endTime / 1000) // Changed
-
-        guard let dataType = dataTypeLookUp(key: dataTypeKey) else { // Changed
-            DispatchQueue.main.async {
-                result(FlutterError(code: "INVALID_DATA_TYPE", message: "Invalid data type key: \(dataTypeKey)", details: nil)) // Changed
-            }
-            return
-        }
+        let dataType = dataTypeLookUp(key: dataTypeKey)
+    
+//        guard let dataType:HKSampleType = dataTypeLookUp(key: dataTypeKey) else { // Changed
+//            DispatchQueue.main.async {
+//                result(FlutterError(code: "INVALID_DATA_TYPE", message: "Invalid data type key: \(dataTypeKey)", details: nil)) // Changed
+//            }
+//            return
+//        }
 
         var unit: HKUnit? = nil // Changed
         if let dataUnitKey = dataUnitKey {
@@ -635,6 +636,8 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                 return // Changed
             }
 
+            guard let self = self else { return } // Added
+
             switch samplesOrNil {
             case let samples as [HKQuantitySample]:
                 let dictionaries = samples.compactMap { sample -> NSDictionary? in // Changed
@@ -656,37 +659,35 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                 }
 
             case var samplesCategory as [HKCategorySample]:
-                if let self = self {
-                    switch dataTypeKey {
-                    case self.SLEEP_IN_BED:
-                        samplesCategory = samplesCategory.filter { $0.value == 0 }
-                    case self.SLEEP_ASLEEP_CORE:
-                        samplesCategory = samplesCategory.filter { $0.value == 3 }
-                    case self.SLEEP_ASLEEP_DEEP:
-                        samplesCategory = samplesCategory.filter { $0.value == 4 }
-                    case self.SLEEP_ASLEEP_REM:
-                        samplesCategory = samplesCategory.filter { $0.value == 5 }
-                    case self.SLEEP_AWAKE:
-                        samplesCategory = samplesCategory.filter { $0.value == 2 }
-                    case self.SLEEP_ASLEEP:
-                        samplesCategory = samplesCategory.filter { $0.value == 3 }
-                    case self.SLEEP_DEEP:
-                        samplesCategory = samplesCategory.filter { $0.value == 4 }
-                    case self.SLEEP_REM:
-                        samplesCategory = samplesCategory.filter { $0.value == 5 }
-                    case self.HEADACHE_UNSPECIFIED:
-                        samplesCategory = samplesCategory.filter { $0.value == 0 }
-                    case self.HEADACHE_NOT_PRESENT:
-                        samplesCategory = samplesCategory.filter { $0.value == 1 }
-                    case self.HEADACHE_MILD:
-                        samplesCategory = samplesCategory.filter { $0.value == 2 }
-                    case self.HEADACHE_MODERATE:
-                        samplesCategory = samplesCategory.filter { $0.value == 3 }
-                    case self.HEADACHE_SEVERE:
-                        samplesCategory = samplesCategory.filter { $0.value == 4 }
-                    default:
-                        break
-                    }
+                switch dataTypeKey {
+                case self.SLEEP_IN_BED:
+                    samplesCategory = samplesCategory.filter { $0.value == 0 }
+                case self.SLEEP_ASLEEP_CORE:
+                    samplesCategory = samplesCategory.filter { $0.value == 3 }
+                case self.SLEEP_ASLEEP_DEEP:
+                    samplesCategory = samplesCategory.filter { $0.value == 4 }
+                case self.SLEEP_ASLEEP_REM:
+                    samplesCategory = samplesCategory.filter { $0.value == 5 }
+                case self.SLEEP_AWAKE:
+                    samplesCategory = samplesCategory.filter { $0.value == 2 }
+                case self.SLEEP_ASLEEP:
+                    samplesCategory = samplesCategory.filter { $0.value == 3 }
+                case self.SLEEP_DEEP:
+                    samplesCategory = samplesCategory.filter { $0.value == 4 }
+                case self.SLEEP_REM:
+                    samplesCategory = samplesCategory.filter { $0.value == 5 }
+                case self.HEADACHE_UNSPECIFIED:
+                    samplesCategory = samplesCategory.filter { $0.value == 0 }
+                case self.HEADACHE_NOT_PRESENT:
+                    samplesCategory = samplesCategory.filter { $0.value == 1 }
+                case self.HEADACHE_MILD:
+                    samplesCategory = samplesCategory.filter { $0.value == 2 }
+                case self.HEADACHE_MODERATE:
+                    samplesCategory = samplesCategory.filter { $0.value == 3 }
+                case self.HEADACHE_SEVERE:
+                    samplesCategory = samplesCategory.filter { $0.value == 4 }
+                default:
+                    break
                 }
                 let categories = samplesCategory.map { sample -> NSDictionary in
                     return [
@@ -707,7 +708,7 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                 let dictionaries = samplesWorkout.map { sample -> NSDictionary in
                     return [
                         "uuid": "\(sample.uuid)",
-                        "workoutActivityType": workoutActivityTypeMap.first(where: {
+                        "workoutActivityType": self.workoutActivityTypeMap.first(where: { // Changed
                             $0.value == sample.workoutActivityType
                         })?.key,
                         "totalEnergyBurned": sample.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()),
@@ -719,7 +720,7 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                         "source_id": sample.sourceRevision.source.bundleIdentifier,
                         "source_name": sample.sourceRevision.source.name,
                         "is_manual_entry": sample.metadata?[HKMetadataKeyWasUserEntered] != nil,
-                        "workout_type": self?.getWorkoutType(type: sample.workoutActivityType),
+                        "workout_type": self.getWorkoutType(type: sample.workoutActivityType), // Changed
                         "total_distance": sample.totalDistance != nil ? Int(sample.totalDistance!.doubleValue(for: HKUnit.meter())) : 0, // Changed
                         "total_energy_burned": sample.totalEnergyBurned != nil ? Int(sample.totalEnergyBurned!.doubleValue(for: HKUnit.kilocalorie())) : 0 // Changed
                     ]
@@ -800,7 +801,9 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
 
             default:
                 if #available(iOS 14.0, *), let ecgSamples = samplesOrNil as? [HKElectrocardiogram] {
-                    let dictionaries = ecgSamples.map(fetchEcgMeasurements)
+                    let dictionaries = ecgSamples.map { sample -> NSDictionary in
+                        return self.fetchEcgMeasurements(sample) // Changed
+                    }
                     DispatchQueue.main.async {
                         result(dictionaries)
                     }
