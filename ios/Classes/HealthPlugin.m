@@ -1,5 +1,5 @@
 #import "HealthPlugin.h"
-#import <health/health-Swift.h>
+#import <health_plugin_fork/health_plugin_fork-Swift.h>
 
 @implementation HealthPlugin
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
