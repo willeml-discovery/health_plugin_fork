@@ -596,43 +596,54 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
 
     func getData(call: FlutterMethodCall, result: @escaping FlutterResult) {
         let arguments = call.arguments as? NSDictionary
-        let dataTypeKey = (arguments?["dataTypeKey"] as? String)!
+        let dataTypeKey = (arguments?["dataTypeKey"] as? String) ?? "" // Changed
         let dataUnitKey = (arguments?["dataUnitKey"] as? String)
-        let startTime = (arguments?["startTime"] as? NSNumber) ?? 0
-        let endTime = (arguments?["endTime"] as? NSNumber) ?? 0
+        let startTime = (arguments?["startTime"] as? NSNumber)?.doubleValue ?? 0.0 // Changed
+        let endTime = (arguments?["endTime"] as? NSNumber)?.doubleValue ?? 0.0 // Changed
         let limit = (arguments?["limit"] as? Int) ?? HKObjectQueryNoLimit
         let includeManualEntry = (arguments?["includeManualEntry"] as? Bool) ?? true
 
         // Convert dates from milliseconds to Date()
-        let dateFrom = Date(timeIntervalSince1970: startTime.doubleValue / 1000)
-        let dateTo = Date(timeIntervalSince1970: endTime.doubleValue / 1000)
+        let dateFrom = Date(timeIntervalSince1970: startTime / 1000) // Changed
+        let dateTo = Date(timeIntervalSince1970: endTime / 1000) // Changed
 
-        let dataType = dataTypeLookUp(key: dataTypeKey)
-        var unit: HKUnit?
+        guard let dataType = dataTypeLookUp(key: dataTypeKey) else { // Changed
+            DispatchQueue.main.async {
+                result(FlutterError(code: "INVALID_DATA_TYPE", message: "Invalid data type key: \(dataTypeKey)", details: nil)) // Changed
+            }
+            return
+        }
+
+        var unit: HKUnit? = nil // Changed
         if let dataUnitKey = dataUnitKey {
             unit = unitDict[dataUnitKey]
         }
 
-        var predicate = HKQuery.predicateForSamples(
-            withStart: dateFrom, end: dateTo, options: .strictStartDate)
-        if (!includeManualEntry) {
+        var predicate = HKQuery.predicateForSamples(withStart: dateFrom, end: dateTo, options: .strictStartDate)
+        if !includeManualEntry {
             let manualPredicate = NSPredicate(format: "metadata.%K != YES", HKMetadataKeyWasUserEntered)
             predicate = NSCompoundPredicate(type: .and, subpredicates: [predicate, manualPredicate])
         }
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
 
-        let query = HKSampleQuery(
-            sampleType: dataType, predicate: predicate, limit: limit, sortDescriptors: [sortDescriptor]
-        ) {
-            [self]
-            x, samplesOrNil, error in
+        let query = HKSampleQuery(sampleType: dataType, predicate: predicate, limit: limit, sortDescriptors: [sortDescriptor]) { // Changed
+            [weak self] _, samplesOrNil, error in // Changed
+            if let error = error { // Changed
+                DispatchQueue.main.async { // Changed
+                    result(FlutterError(code: "HK_SAMPLE_QUERY_ERROR", message: error.localizedDescription, details: nil)) // Changed
+                }
+                return // Changed
+            }
 
             switch samplesOrNil {
-            case let (samples as [HKQuantitySample]) as Any:
-                let dictionaries = samples.map { sample -> NSDictionary in
+            case let samples as [HKQuantitySample]:
+                let dictionaries = samples.compactMap { sample -> NSDictionary? in // Changed
+                    guard let quantity = sample.quantity.doubleValue(for: unit ?? HKUnit.count()) as Double? else { // Changed
+                        return nil // Changed
+                    }
                     return [
                         "uuid": "\(sample.uuid)",
-                        "value": sample.quantity.doubleValue(for: unit!),
+                        "value": quantity, // Changed
                         "date_from": Int(sample.startDate.timeIntervalSince1970 * 1000),
                         "date_to": Int(sample.endDate.timeIntervalSince1970 * 1000),
                         "source_id": sample.sourceRevision.source.bundleIdentifier,
@@ -644,46 +655,38 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                     result(dictionaries)
                 }
 
-            case var (samplesCategory as [HKCategorySample]) as Any:
-
-                if dataTypeKey == self.SLEEP_IN_BED {
-                    samplesCategory = samplesCategory.filter { $0.value == 0 }
-                }
-                if dataTypeKey == self.SLEEP_ASLEEP_CORE {
-                    samplesCategory = samplesCategory.filter { $0.value == 3 }
-                }
-                if dataTypeKey == self.SLEEP_ASLEEP_DEEP {
-                    samplesCategory = samplesCategory.filter { $0.value == 4 }
-                }
-                if dataTypeKey == self.SLEEP_ASLEEP_REM {
-                    samplesCategory = samplesCategory.filter { $0.value == 5 }
-                }
-                if dataTypeKey == self.SLEEP_AWAKE {
-                    samplesCategory = samplesCategory.filter { $0.value == 2 }
-                }
-                if dataTypeKey == self.SLEEP_ASLEEP {
-                    samplesCategory = samplesCategory.filter { $0.value == 3 }
-                }
-                if dataTypeKey == self.SLEEP_DEEP {
-                    samplesCategory = samplesCategory.filter { $0.value == 4 }
-                }
-                if dataTypeKey == self.SLEEP_REM {
-                    samplesCategory = samplesCategory.filter { $0.value == 5 }
-                }
-                if dataTypeKey == self.HEADACHE_UNSPECIFIED {
-                    samplesCategory = samplesCategory.filter { $0.value == 0 }
-                }
-                if dataTypeKey == self.HEADACHE_NOT_PRESENT {
-                    samplesCategory = samplesCategory.filter { $0.value == 1 }
-                }
-                if dataTypeKey == self.HEADACHE_MILD {
-                    samplesCategory = samplesCategory.filter { $0.value == 2 }
-                }
-                if dataTypeKey == self.HEADACHE_MODERATE {
-                    samplesCategory = samplesCategory.filter { $0.value == 3 }
-                }
-                if dataTypeKey == self.HEADACHE_SEVERE {
-                    samplesCategory = samplesCategory.filter { $0.value == 4 }
+            case var samplesCategory as [HKCategorySample]:
+                if let self = self {
+                    switch dataTypeKey {
+                    case self.SLEEP_IN_BED:
+                        samplesCategory = samplesCategory.filter { $0.value == 0 }
+                    case self.SLEEP_ASLEEP_CORE:
+                        samplesCategory = samplesCategory.filter { $0.value == 3 }
+                    case self.SLEEP_ASLEEP_DEEP:
+                        samplesCategory = samplesCategory.filter { $0.value == 4 }
+                    case self.SLEEP_ASLEEP_REM:
+                        samplesCategory = samplesCategory.filter { $0.value == 5 }
+                    case self.SLEEP_AWAKE:
+                        samplesCategory = samplesCategory.filter { $0.value == 2 }
+                    case self.SLEEP_ASLEEP:
+                        samplesCategory = samplesCategory.filter { $0.value == 3 }
+                    case self.SLEEP_DEEP:
+                        samplesCategory = samplesCategory.filter { $0.value == 4 }
+                    case self.SLEEP_REM:
+                        samplesCategory = samplesCategory.filter { $0.value == 5 }
+                    case self.HEADACHE_UNSPECIFIED:
+                        samplesCategory = samplesCategory.filter { $0.value == 0 }
+                    case self.HEADACHE_NOT_PRESENT:
+                        samplesCategory = samplesCategory.filter { $0.value == 1 }
+                    case self.HEADACHE_MILD:
+                        samplesCategory = samplesCategory.filter { $0.value == 2 }
+                    case self.HEADACHE_MODERATE:
+                        samplesCategory = samplesCategory.filter { $0.value == 3 }
+                    case self.HEADACHE_SEVERE:
+                        samplesCategory = samplesCategory.filter { $0.value == 4 }
+                    default:
+                        break
+                    }
                 }
                 let categories = samplesCategory.map { sample -> NSDictionary in
                     return [
@@ -700,8 +703,7 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                     result(categories)
                 }
 
-            case let (samplesWorkout as [HKWorkout]) as Any:
-
+            case let samplesWorkout as [HKWorkout]:
                 let dictionaries = samplesWorkout.map { sample -> NSDictionary in
                     return [
                         "uuid": "\(sample.uuid)",
@@ -717,27 +719,24 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                         "source_id": sample.sourceRevision.source.bundleIdentifier,
                         "source_name": sample.sourceRevision.source.name,
                         "is_manual_entry": sample.metadata?[HKMetadataKeyWasUserEntered] != nil,
-                        "workout_type": self.getWorkoutType(type: sample.workoutActivityType),
-                        "total_distance": sample.totalDistance != nil ? Int(sample.totalDistance!.doubleValue(for: HKUnit.meter())) : 0,
-                        "total_energy_burned": sample.totalEnergyBurned != nil ? Int(sample.totalEnergyBurned!.doubleValue(for: HKUnit.kilocalorie())) : 0
+                        "workout_type": self?.getWorkoutType(type: sample.workoutActivityType),
+                        "total_distance": sample.totalDistance != nil ? Int(sample.totalDistance!.doubleValue(for: HKUnit.meter())) : 0, // Changed
+                        "total_energy_burned": sample.totalEnergyBurned != nil ? Int(sample.totalEnergyBurned!.doubleValue(for: HKUnit.kilocalorie())) : 0 // Changed
                     ]
                 }
-
                 DispatchQueue.main.async {
                     result(dictionaries)
                 }
 
-            case let (samplesAudiogram as [HKAudiogramSample]) as Any:
+            case let samplesAudiogram as [HKAudiogramSample]:
                 let dictionaries = samplesAudiogram.map { sample -> NSDictionary in
                     var frequencies = [Double]()
                     var leftEarSensitivities = [Double]()
                     var rightEarSensitivities = [Double]()
                     for samplePoint in sample.sensitivityPoints {
                         frequencies.append(samplePoint.frequency.doubleValue(for: HKUnit.hertz()))
-                        leftEarSensitivities.append(
-                            samplePoint.leftEarSensitivity!.doubleValue(for: HKUnit.decibelHearingLevel()))
-                        rightEarSensitivities.append(
-                            samplePoint.rightEarSensitivity!.doubleValue(for: HKUnit.decibelHearingLevel()))
+                        leftEarSensitivities.append(samplePoint.leftEarSensitivity?.doubleValue(for: HKUnit.decibelHearingLevel()) ?? 0.0) // Changed
+                        rightEarSensitivities.append(samplePoint.rightEarSensitivity?.doubleValue(for: HKUnit.decibelHearingLevel()) ?? 0.0) // Changed
                     }
                     return [
                         "uuid": "\(sample.uuid)",
@@ -747,41 +746,38 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                         "date_from": Int(sample.startDate.timeIntervalSince1970 * 1000),
                         "date_to": Int(sample.endDate.timeIntervalSince1970 * 1000),
                         "source_id": sample.sourceRevision.source.bundleIdentifier,
-                        "source_name": sample.sourceRevision.source.name,
+                        "source_name": sample.sourceRevision.source.name
                     ]
                 }
                 DispatchQueue.main.async {
                     result(dictionaries)
                 }
 
-            case let (nutritionSample as [HKCorrelation]) as Any:
-
-                //let samples = nutritionSample[0].objects(for: HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed)!)
+            case let nutritionSample as [HKCorrelation]:
                 var calories = 0.0
                 var fat = 0.0
                 var carbs = 0.0
                 var protein = 0.0
 
-                let name = nutritionSample[0].metadata?[HKMetadataKeyFoodType] as! String
-                let mealType = nutritionSample[0].metadata?["HKFoodMeal"]
+                let name = nutritionSample[0].metadata?[HKMetadataKeyFoodType] as? String ?? "" // Changed
+                let mealType = nutritionSample[0].metadata?["HKFoodMeal"] as? String
                 let samples = nutritionSample[0].objects
                 for sample in samples {
                     if let quantitySample = sample as? HKQuantitySample {
-                        if (quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed)){
+                        if quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
                             calories = quantitySample.quantity.doubleValue(for: HKUnit.kilocalorie())
                         }
-                        if (quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryCarbohydrates)){
+                        if quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryCarbohydrates) {
                             carbs = quantitySample.quantity.doubleValue(for: HKUnit.gram())
                         }
-                        if (quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryProtein)){
+                        if quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryProtein) {
                             protein = quantitySample.quantity.doubleValue(for: HKUnit.gram())
                         }
-                        if (quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryFatTotal)){
+                        if quantitySample.quantityType == HKObjectType.quantityType(forIdentifier: .dietaryFatTotal) {
                             fat = quantitySample.quantity.doubleValue(for: HKUnit.gram())
                         }
                     }
                 }
-
 
                 let dictionaries = nutritionSample.map { sample -> NSDictionary in
                     return [
@@ -795,7 +791,7 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
                         "date_from": Int(sample.startDate.timeIntervalSince1970 * 1000),
                         "date_to": Int(sample.endDate.timeIntervalSince1970 * 1000),
                         "source_id": sample.sourceRevision.source.bundleIdentifier,
-                        "source_name": sample.sourceRevision.source.name,
+                        "source_name": sample.sourceRevision.source.name
                     ]
                 }
                 DispatchQueue.main.async {
