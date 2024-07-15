@@ -33,6 +33,6 @@ flutter:
     platforms:
       android:
         package: cachet.plugins.health
-        pluginClass: HealthPluginFork
+        pluginClass: HealthPlugin
       ios:
-        pluginClass: HealthPluginFork
+        pluginClass: HealthPlugin
