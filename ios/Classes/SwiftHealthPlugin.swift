@@ -127,81 +127,89 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
         let message: String
     }
 
-    public static func register(with registrar: FlutterPluginRegistrar) {
+   public static func register(with registrar: FlutterPluginRegistrar) {
+       do {
         let channel = FlutterMethodChannel(
             name: "flutter_health", binaryMessenger: registrar.messenger())
         let instance = SwiftHealthPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
+        } catch {
+         print("Caught an unexpected error: \(error)")
+        }
     }
-
+ 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         // Set up all data types
-        initializeTypes()
-
-        /// Handle checkIfHealthDataAvailable
-        if call.method.elementsEqual("checkIfHealthDataAvailable") {
-            checkIfHealthDataAvailable(call: call, result: result)
-        }/// Handle requestAuthorization
-        else if call.method.elementsEqual("requestAuthorization") {
-            try! requestAuthorization(call: call, result: result)
+        do {
+            initializeTypes()
+ 
+            /// Handle checkIfHealthDataAvailable
+            if call.method.elementsEqual("checkIfHealthDataAvailable") {
+                checkIfHealthDataAvailable(call: call, result: result)
+            }/// Handle requestAuthorization
+            else if call.method.elementsEqual("requestAuthorization") {
+                try! requestAuthorization(call: call, result: result)
+            }
+ 
+            /// Handle getData
+            else if call.method.elementsEqual("getData") {
+                getData(call: call, result: result)
+            }
+ 
+            /// Handle getIntervalData
+            else if (call.method.elementsEqual("getIntervalData")){
+                getIntervalData(call: call, result: result)
+            }
+ 
+            /// Handle getTotalStepsInInterval
+            else if call.method.elementsEqual("getTotalStepsInInterval") {
+                getTotalStepsInInterval(call: call, result: result)
+            }
+ 
+            /// Handle writeData
+            else if call.method.elementsEqual("writeData") {
+                try! writeData(call: call, result: result)
+            }
+ 
+            /// Handle writeAudiogram
+            else if call.method.elementsEqual("writeAudiogram") {
+                try! writeAudiogram(call: call, result: result)
+            }
+ 
+            /// Handle writeBloodPressure
+            else if call.method.elementsEqual("writeBloodPressure") {
+                try! writeBloodPressure(call: call, result: result)
+            }
+ 
+            /// Handle writeMeal
+            else if (call.method.elementsEqual("writeMeal")){
+                try! writeMeal(call: call, result: result)
+            }
+ 
+            /// Handle writeWorkoutData
+            else if call.method.elementsEqual("writeWorkoutData") {
+                try! writeWorkoutData(call: call, result: result)
+            }
+ 
+            /// Handle hasPermission
+            else if call.method.elementsEqual("hasPermissions") {
+                try! hasPermissions(call: call, result: result)
+            }
+ 
+            /// Handle delete data
+            else if call.method.elementsEqual("delete") {
+                try! delete(call: call, result: result)
+            }
+ 
+            /// Disconnect
+            else if (call.method.elementsEqual("disconnect")){
+                // Do nothing.
+                result(true)
+            }
+        } catch {
+            // Handle other errors
+            print("Caught an unexpected error: \(error)")
         }
-
-        /// Handle getData
-        else if call.method.elementsEqual("getData") {
-            getData(call: call, result: result)
-        }
-
-        /// Handle getIntervalData
-        else if (call.method.elementsEqual("getIntervalData")){
-            getIntervalData(call: call, result: result)
-        }
-
-        /// Handle getTotalStepsInInterval
-        else if call.method.elementsEqual("getTotalStepsInInterval") {
-            getTotalStepsInInterval(call: call, result: result)
-        }
-
-        /// Handle writeData
-        else if call.method.elementsEqual("writeData") {
-            try! writeData(call: call, result: result)
-        }
-
-        /// Handle writeAudiogram
-        else if call.method.elementsEqual("writeAudiogram") {
-            try! writeAudiogram(call: call, result: result)
-        }
-
-        /// Handle writeBloodPressure
-        else if call.method.elementsEqual("writeBloodPressure") {
-            try! writeBloodPressure(call: call, result: result)
-        }
-
-        /// Handle writeMeal
-        else if (call.method.elementsEqual("writeMeal")){
-            try! writeMeal(call: call, result: result)
-        }
-
-        /// Handle writeWorkoutData
-        else if call.method.elementsEqual("writeWorkoutData") {
-            try! writeWorkoutData(call: call, result: result)
-        }
-
-        /// Handle hasPermission
-        else if call.method.elementsEqual("hasPermissions") {
-            try! hasPermissions(call: call, result: result)
-        }
-
-        /// Handle delete data
-        else if call.method.elementsEqual("delete") {
-            try! delete(call: call, result: result)
-        }
-
-        /// Disconnect
-        else if (call.method.elementsEqual("disconnect")){
-            // Do nothing.
-            result(true)
-        }
-
     }
 
     func checkIfHealthDataAvailable(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -595,6 +603,8 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
     }
 
     func getData(call: FlutterMethodCall, result: @escaping FlutterResult) {
+     
+     do{
         let arguments = call.arguments as? NSDictionary
         let dataTypeKey = (arguments?["dataTypeKey"] as? String) ?? "" // Changed
         let dataUnitKey = (arguments?["dataUnitKey"] as? String)
@@ -817,6 +827,9 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
         }
 
         HKHealthStore().execute(query)
+        } catch {
+           print("Caught an unexpected error: \(error)")
+        }
     }
 
     @available(iOS 14.0, *)
