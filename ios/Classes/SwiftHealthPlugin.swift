@@ -716,11 +716,15 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
 
             case let samplesWorkout as [HKWorkout]:
                 let dictionaries = samplesWorkout.map { sample -> NSDictionary in
+                    let workoutTypeKey: String
+                    if let firstMatch = self.workoutActivityTypeMap.first(where: { $0.value == sample.workoutActivityType }) {
+                        workoutTypeKey = firstMatch.key
+                    } else {
+                        workoutTypeKey = "OTHER"
+                    }
                     return [
                         "uuid": "\(sample.uuid)",
-                        "workoutActivityType": self.workoutActivityTypeMap.first(where: {
-                            $0.value == sample.workoutActivityType
-                        })?.key ?? "OTHER",
+                        "workoutActivityType": workoutTypeKey,
                         "totalEnergyBurned": sample.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()),
                         "totalEnergyBurnedUnit": "KILOCALORIE",
                         "totalDistance": sample.totalDistance?.doubleValue(for: HKUnit.meter()),
