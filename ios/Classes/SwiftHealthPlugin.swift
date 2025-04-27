@@ -637,16 +637,11 @@ public class SwiftHealthPlugin: NSObject, FlutterPlugin {
         }
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
 
-        let query = HKSampleQuery(sampleType: dataType, predicate: predicate, limit: limit, sortDescriptors: [sortDescriptor]) { // Changed
-            [weak self] _, samplesOrNil, error in // Changed
-            if let error = error { // Changed
-                DispatchQueue.main.async { // Changed
-                    result(FlutterError(code: "HK_SAMPLE_QUERY_ERROR", message: error.localizedDescription, details: nil)) // Changed
-                }
-                return // Changed
-            }
-
-            guard let self = self else { return } // Added
+         let query = HKSampleQuery(
+                    sampleType: dataType, predicate: predicate, limit: limit, sortDescriptors: [sortDescriptor]
+                ) {
+                    [self]
+                    x, samplesOrNil, error in
 
             switch samplesOrNil {
             case let samples as [HKQuantitySample]:

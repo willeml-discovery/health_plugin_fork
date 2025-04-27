@@ -1,6 +1,6 @@
 name: health_plugin_fork
 description: Wrapper for HealthKit on iOS and Google Fit and Health Connect on Android forked.
-version: 10.2.0
+version: 10.2.1
 publish_to: 'none'
 homepage: https://github.com/cph-cachet/flutter-plugins/tree/master/packages/health
 

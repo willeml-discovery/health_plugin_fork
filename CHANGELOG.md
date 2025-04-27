@@ -1,3 +1,7 @@
+## 10.2.1
+
+* Removed some changed code from SwiftHealthPlugin.swift and replaced with orignal one as in Health plugin.
+
 ## 10.2.0
 
 * Using named parameters in most methods for consistency.
